@@ -1,0 +1,17 @@
+[package]
+name = "async-socket"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+rustls-pemfile = "1.0.2"
+tokio-rustls = "0.23.4"
+webpki-roots = "0.22.6"
+
+
+[dev-dependencies]
+rand = "0.8.5"
+openssl = "0.10.45"
