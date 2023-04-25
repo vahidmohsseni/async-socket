@@ -1,5 +1,5 @@
 [package]
-name = "async-socket"
+name = "async_socket"
 version = "0.1.0"
 edition = "2021"
 
@@ -15,3 +15,4 @@ webpki-roots = "0.22.6"
 [dev-dependencies]
 rand = "0.8.5"
 openssl = "0.10.45"
+async_socket = { path = "."}

@@ -59,14 +59,15 @@ mod server_test {
 
     extern crate openssl;
 
-    use crate::utils::{accpet_connection, connect};
+    use crate::{accept::accpet_connection, connect::connect};
     use rand::Rng;
     use std::{
         fs::{create_dir, File},
         io::{self, Write},
         net::ToSocketAddrs,
         path::Path,
-        thread::{self, JoinHandle}, time::Duration,
+        thread::{self, JoinHandle},
+        time::Duration,
     };
     use tokio::runtime::Runtime;
 
@@ -102,14 +103,13 @@ mod server_test {
                 true,
                 Some(path.join("key.pem")),
                 Some(path.join("cert.pem")),
-            ))
-            ;
+            ));
         });
 
         threads.insert(0, server_th);
 
         thread::sleep(Duration::from_secs(1));
-        
+
         let client_th = thread::spawn(move || {
             let dir = format!("./test-dir-{}/", rand).to_string();
             let path = Path::new(&dir);
@@ -117,7 +117,7 @@ mod server_test {
             let addr = "10.100.1.3:5000".to_socket_addrs().unwrap().next();
             rt.block_on(connect(addr.unwrap(), Some(path.join("cert.pem"))));
         });
-        
+
         threads.insert(1, client_th);
 
         for i in threads {
