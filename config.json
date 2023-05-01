@@ -1,0 +1,8 @@
+{
+    "host": "localhost",
+    "port": 5000,
+    "tls_enabled": true,
+    "cert_file": "keys/cert.pem",
+    "key_file": "keys/key.pem"
+    
+}

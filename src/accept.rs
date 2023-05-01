@@ -1,63 +1,121 @@
-use std::io;
+use std::net::SocketAddr;
+use std::path::Path;
 use std::sync::Arc;
-use std::{net::SocketAddr, path::PathBuf};
-use tokio_rustls::rustls;
+use std::{io, path::PathBuf};
+use tokio_rustls::{rustls, TlsAcceptor};
 
 use tokio::{
-    io::split,
-    io::{AsyncReadExt, AsyncWriteExt},
+    net::{TcpListener, TcpStream},
+    select,
 };
 
-use tokio_rustls::TlsAcceptor;
+use crate::manager::control_loop;
+use crate::utils::server_helper::ServerConfig;
 
-use tokio::net::TcpListener;
+pub struct Server {
+    config: ServerConfig,
+}
 
-use crate::utils::{load_certs, load_keys};
+impl Server {
+    pub fn from_conf_file(path: &Path) -> io::Result<Server> {
+        Ok(Server {
+            config: ServerConfig::from_json_file(path)?,
+        })
+    }
 
-pub async fn accpet_connection(
-    address: SocketAddr,
-    tls_enabled: bool,
-    tls_key: Option<PathBuf>,
-    tls_cert: Option<PathBuf>,
-) -> io::Result<()> {
-    println!("running server .... ... .....");
+    pub fn from_args(
+        host: String,
+        port: u16,
+        tls_enabled: bool,
+        cert_file: PathBuf,
+        key_file: PathBuf,
+    ) -> io::Result<Server> {
+        Ok(Server {
+            config: ServerConfig::from_args(host, port, tls_enabled, cert_file, key_file),
+        })
+    }
+
+    pub async fn run_server(self) -> io::Result<()> {
+        let accept_fut = accpet_connection(&self.config);
+
+        tokio::pin!(accept_fut);
+
+        loop {
+            select! {
+                accept_result = &mut accept_fut => {
+                    match accept_result {
+                        Ok(result) => println!("This is not possible: {:?}", result),
+                        Err(error) => {
+                            match error.kind() {
+                                io::ErrorKind::NotFound => todo!(),
+                                io::ErrorKind::PermissionDenied => todo!(),
+                                io::ErrorKind::ConnectionRefused => todo!(),
+                                io::ErrorKind::ConnectionReset => todo!(),
+                                io::ErrorKind::ConnectionAborted => todo!(),
+                                io::ErrorKind::NotConnected => todo!(),
+                                io::ErrorKind::AddrInUse => todo!(),
+                                io::ErrorKind::AddrNotAvailable => todo!(),
+                                io::ErrorKind::BrokenPipe => todo!(),
+                                io::ErrorKind::AlreadyExists => todo!(),
+                                io::ErrorKind::WouldBlock => todo!(),
+                                io::ErrorKind::InvalidInput => todo!(),
+                                io::ErrorKind::InvalidData => todo!(),
+                                io::ErrorKind::TimedOut => todo!(),
+                                io::ErrorKind::WriteZero => todo!(),
+                                io::ErrorKind::Interrupted => todo!(),
+                                io::ErrorKind::Unsupported => todo!(),
+                                io::ErrorKind::UnexpectedEof => todo!(),
+                                io::ErrorKind::OutOfMemory => todo!(),
+                                io::ErrorKind::Other => todo!(),
+                                _ => todo!(),
+                            }
+                        },
+                    }
+                }
+            }
+        }
+    }
+}
+
+async fn accpet_connection(config: &ServerConfig) -> io::Result<()> {
+    let address = config.get_address()?;
+    let (tls_cert, tls_key) = config.load_cert_and_key()?;
+    let tls_enabled = config.is_tls_enabled();
+
+    println!("running server ............");
     let listener = TcpListener::bind(address).await?;
 
     if tls_enabled {
-        let certs = load_certs(&tls_cert.expect("Error: A valid cert is required!"))?;
-
-        let mut keys = load_keys(&tls_key.expect("Error: A valid key is required!"))?;
-
-        println!("len keys: {:?} \n len certs: {:?}", keys, certs);
-
-        let config = rustls::ServerConfig::builder()
+        let tls_config = rustls::ServerConfig::builder()
             .with_safe_defaults()
             .with_no_client_auth()
-            .with_single_cert(certs, keys.remove(0))
+            .with_single_cert(tls_cert, tls_key)
             .map_err(|err| io::Error::new(io::ErrorKind::InvalidInput, err))?;
-        let acceptor = TlsAcceptor::from(Arc::new(config));
-        println!("waiting ... ");
+        let acceptor = TlsAcceptor::from(Arc::new(tls_config));
+        println!("Waiting for a client... ");
 
         loop {
             let (stream, address) = listener.accept().await?;
             println!("Accepting connection from: {}", address);
-            let acceptor = acceptor.clone();
-
-            let fut = async move {
-                let mut stream = acceptor.accept(stream).await?;
-                println!("TLS established!");
-                let (mut reader, mut writer) = split(stream);
-
-                let mut buffer = [0 as u8; 16];
-                reader.read_exact(&mut buffer).await?;
-                println!("Data: {:?}", buffer);
-                writer.write(&buffer).await?;
-                writer.flush().await?;
-
-                Ok(()) as io::Result<()>
-            };
+            tokio::spawn(establish_connection(acceptor.clone(), stream, address));
         }
     }
+
+    Ok(())
+}
+
+async fn establish_connection(
+    acceptor: TlsAcceptor,
+    stream: TcpStream,
+    address: SocketAddr,
+) -> io::Result<()> {
+    let stream = acceptor.accept(stream).await?;
+    println!("TLS established from address: {address}");
+
+    // run a macro to handle
+    // let a = manage!(reader, writer);
+
+    control_loop(stream).await;
 
     Ok(())
 }
