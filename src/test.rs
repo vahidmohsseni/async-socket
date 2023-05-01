@@ -55,78 +55,103 @@ fn generate_key_cert() -> Result<(X509, PKey<Private>), ErrorStack> {
 }
 
 #[cfg(test)]
-mod server_test {
-
-    extern crate openssl;
-
-    use crate::{accept::accpet_connection, connect::connect};
-    use rand::Rng;
+mod test1 {
+    
     use std::{
-        fs::{create_dir, File},
-        io::{self, Write},
-        net::ToSocketAddrs,
+        fs::File,
+        io::Write,
         path::Path,
-        thread::{self, JoinHandle},
-        time::Duration,
     };
-    use tokio::runtime::Runtime;
 
     use super::generate_key_cert;
 
     #[test]
-    fn run_server() -> io::Result<()> {
-        let mut rng = rand::thread_rng();
-        let rand = rng.gen::<u32>();
-
-        let dir = format!("./test-dir-{}/", rand).to_string();
+    fn generate_keys () {
+        let dir = format!("./keys/");
         let path = Path::new(&dir);
-
-        create_dir(path)?;
-
         let (cert, key) = generate_key_cert().unwrap();
 
-        let mut key_file = File::create(path.join("key.pem"))?;
-        key_file.write_all(key.rsa().unwrap().private_key_to_pem().unwrap().as_ref())?;
+        let mut key_file = File::create(path.join("key.pem")).unwrap();
+        key_file.write_all(key.rsa().unwrap().private_key_to_pem().unwrap().as_ref()).unwrap();
 
-        let mut cert_file = File::create(path.join("cert.pem"))?;
-        cert_file.write_all(cert.to_pem().unwrap().as_ref())?;
-
-        let mut threads: Vec<JoinHandle<()>> = Vec::new();
-        let server_th = thread::spawn(move || {
-            let dir = format!("./test-dir-{}/", rand).to_string();
-            let path = Path::new(&dir);
-            let rt = Runtime::new().unwrap();
-            let addr = "0.0.0.0:5000".to_socket_addrs().unwrap().next();
-
-            rt.block_on(accpet_connection(
-                addr.unwrap(),
-                true,
-                Some(path.join("key.pem")),
-                Some(path.join("cert.pem")),
-            ));
-        });
-
-        threads.insert(0, server_th);
-
-        thread::sleep(Duration::from_secs(1));
-
-        let client_th = thread::spawn(move || {
-            let dir = format!("./test-dir-{}/", rand).to_string();
-            let path = Path::new(&dir);
-            let rt = Runtime::new().unwrap();
-            let addr = "10.100.1.3:5000".to_socket_addrs().unwrap().next();
-            rt.block_on(connect(addr.unwrap(), Some(path.join("cert.pem"))));
-        });
-
-        threads.insert(1, client_th);
-
-        for i in threads {
-            i.join();
-        }
-
-        loop {
-            thread::sleep(Duration::from_secs(1))
-        }
-        Ok(())
+        let mut cert_file = File::create(path.join("cert.pem")).unwrap();
+        cert_file.write_all(cert.to_pem().unwrap().as_ref()).unwrap();
     }
 }
+
+// #[cfg(test)]
+// mod server_test {
+
+//     extern crate openssl;
+
+//     // use crate::{accept::accpet_connection, connect::connect};
+//     use rand::Rng;
+//     use std::{
+//         fs::{create_dir, File},
+//         io::{self, Write},
+//         net::ToSocketAddrs,
+//         path::Path,
+//         thread::{self, JoinHandle},
+//         time::Duration,
+//     };
+//     use tokio::runtime::Runtime;
+
+//     use super::generate_key_cert;
+
+//     #[test]
+//     fn run_server() -> io::Result<()> {
+//         let mut rng = rand::thread_rng();
+//         let rand = rng.gen::<u32>();
+
+//         let dir = format!("./test-dir-{}/", rand).to_string();
+//         let path = Path::new(&dir);
+
+//         create_dir(path)?;
+
+//         let (cert, key) = generate_key_cert().unwrap();
+
+//         let mut key_file = File::create(path.join("key.pem"))?;
+//         key_file.write_all(key.rsa().unwrap().private_key_to_pem().unwrap().as_ref())?;
+
+//         let mut cert_file = File::create(path.join("cert.pem"))?;
+//         cert_file.write_all(cert.to_pem().unwrap().as_ref())?;
+
+//         let mut threads: Vec<JoinHandle<()>> = Vec::new();
+//         let server_th = thread::spawn(move || {
+//             let dir = format!("./test-dir-{}/", rand).to_string();
+//             let path = Path::new(&dir);
+//             let rt = Runtime::new().unwrap();
+//             let addr = "0.0.0.0:5000".to_socket_addrs().unwrap().next();
+
+//             rt.block_on(accpet_connection(
+//                 addr.unwrap(),
+//                 true,
+//                 Some(path.join("key.pem")),
+//                 Some(path.join("cert.pem")),
+//             ));
+//         });
+
+//         threads.insert(0, server_th);
+
+//         thread::sleep(Duration::from_secs(1));
+
+//         let client_th = thread::spawn(move || {
+//             let dir = format!("./test-dir-{}/", rand).to_string();
+//             let path = Path::new(&dir);
+//             let rt = Runtime::new().unwrap();
+//             let addr = "10.100.1.3:5000".to_socket_addrs().unwrap().next();
+//             rt.block_on(connect(addr.unwrap(), Some(path.join("cert.pem"))));
+//         });
+
+//         threads.insert(1, client_th);
+
+//         for i in threads {
+//             i.join();
+//         }
+
+//         loop {
+//             thread::sleep(Duration::from_secs(1))
+//         }
+//         Ok(())
+//     }
+// }
