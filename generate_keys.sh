@@ -8,21 +8,23 @@ cd keys/
 # source: https://users.rust-lang.org/t/use-tokio-tungstenite-with-rustls-instead-of-native-tls-for-secure-websockets/90130
 
 # Create unencrypted private key and a CSR (certificate signing request)
-openssl req -newkey rsa:2048 -nodes -subj "/C=FI/ST=FreeWorld/O=UniOulu/CN=vahid" -keyout key.pem -out key.csr
+openssl req -newkey rsa:2048 -nodes -subj "/C=FI/CN=vahid" -keyout key.pem -out key.csr
 
 # Create self-signed certificate (`cert.pem`) with the private key and CSR
 openssl x509 -signkey key.pem -in key.csr -req -days 365 -out cert.pem
 
 # Create a self-signed root CA
-openssl req -x509 -sha256 -nodes -subj "/C=FI/ST=FreeWorld/O=UniOulu/CN=vahid" -days 1825 -newkey rsa:2048 -keyout rootCA.key -out rootCA.crt
+openssl req -x509 -sha256 -nodes -subj "/C=FI/CN=vahid" -days 1825 -newkey rsa:2048 -keyout rootCA.key -out rootCA.crt
 
 
+# Create file localhost.ext with the following content:
 cat <<'EOF' >> localhost.ext
 authorityKeyIdentifier=keyid,issuer
 basicConstraints=CA:FALSE
 subjectAltName = @alt_names
 [alt_names]
 DNS.1 = localhost
+IP.1 = 127.0.0.1
 EOF
 
 # Sign the CSR (`cert.pem`) with the root CA certificate and private key
