@@ -1,16 +1,28 @@
+use tokio::select;
+
 extern crate async_socket;
 
-use std::{net::ToSocketAddrs, path::{PathBuf, Path}};
+use std::{io, path::Path};
 
-use async_socket::accept::accpet_connection;
+use async_socket::accept::Server;
 
-fn main() -> () {
-    println!("Hello from server");
+#[tokio::main]
+async fn main() -> io::Result<()> {
+    println!("Hello from server!");
 
-    accpet_connection("0.0.0.0:5000".to_socket_addrs().unwrap().next(),
-        true, 
-        Path::new("keys/key.pem"), 
-        Path::new("keys/cert.pem"));
-    
-    return;
+    let path = Path::new("config.json");
+
+    let server = Server::from_conf_file(path)?;
+
+    let serve_loop = server.run_server().await;
+
+    loop {
+        select! {
+            _ = tokio::time::sleep(std::time::Duration::from_secs(1)), if serve_loop.is_err() => {
+                // do something after waiting for 1 second
+            }
+        }
+    }
+
+    // Ok(())
 }
