@@ -161,7 +161,7 @@ pub async fn node_control_loop<
     loop {
         select! {
 
-            _ = tokio::time::sleep(std::time::Duration::from_millis(100)) => {
+            _ = tokio::time::sleep(std::time::Duration::from_millis(1)) => {
                 match recv.try_recv(){
                     Ok(d) => {
                         // log::debug!("data: {:?}", d);
@@ -171,7 +171,10 @@ pub async fn node_control_loop<
                     Err(e) => {
                         match e {
                             mpsc::error::TryRecvError::Empty => {},
-                            mpsc::error::TryRecvError::Disconnected => {log::debug!("node: {:?} disconnected", address); break;},
+                            mpsc::error::TryRecvError::Disconnected => {
+                                log::debug!("node: {:?} disconnected", address);
+                                break;
+                            },
                         }
                     },
                 };
@@ -187,7 +190,7 @@ pub async fn node_control_loop<
                         match e {
                             mpsc::error::TryRecvError::Empty => {},
                             mpsc::error::TryRecvError::Disconnected => {
-                                log::error!("Upper channel is disconnected!");
+                                log::error!("Upper channel for {address} is cloded unexpectedly!");
                                 recv.close();
                                 break;
                             },

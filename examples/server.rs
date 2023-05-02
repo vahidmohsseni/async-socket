@@ -32,29 +32,38 @@ async fn main() -> io::Result<()> {
 
     let _serve_loop = tokio::spawn(server.run_server(tx));
 
-    let mut senders = Vec::with_capacity(10);
-
+    let mut senders:Vec<mpsc::Sender<BytesMut>> = Vec::with_capacity(10);
+    let mut nodes = Vec::with_capacity(10);
     let mut send = 0;
     loop {
         select! {
 
-            _ = tokio::time::sleep(std::time::Duration::from_secs(1)) => {
+            _ = tokio::time::sleep(std::time::Duration::from_millis(100)) => {
                 // do something after waiting for 1 second
                 let d = _rx.recv().await.unwrap();
                 
                 match d {
-                    NodeMsg::Event(addr, data) => log::info!("addr {} sent: {:?}",addr,  data),
+                    NodeMsg::Event(addr, data) => { if data == BytesMut::from("bit") {continue;} log::info!("addr {} sent: {:?}",addr,  data);},
                     NodeMsg::Connected(addr) => log::info!("addr {addr} is connected!"),
                     NodeMsg::Disconnected(addr) => {
                         log::warn!("addr {addr} is disconnected!");
                         send -= 1;
-                        senders.pop();
+                        let indx = nodes.iter().position(|&x| x == addr).unwrap();
+                        nodes.remove(indx);
+                        senders.remove(indx);
                     },
-                    NodeMsg::Sender(_, sen) => {senders.push(sen); send += 1;},
+                    NodeMsg::Sender(addr, sen) => {
+                        log::info!("addr {addr} is added!");
+                        senders.push(sen); nodes.push(addr); send += 1;
+                    },
                 }
 
                 if send > 0{
-                    senders[0].send(BytesMut::from("Por roo gharine meshki!")).await.unwrap();
+                    for i in 0..send{
+                        if senders[i].send(BytesMut::from("kir to khomeini!")).await.is_err(){
+                            log::debug!("Error! address {:?}", nodes);
+                        };
+                    }
                 }
             }
         }
