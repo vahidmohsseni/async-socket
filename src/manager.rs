@@ -98,7 +98,7 @@ pub async fn control_loop<
 
     let mut result = Ok(());
 
-    send_back.send((recv_rx, send_tx.clone())).await;
+    send_back.send((recv_rx, send_tx.clone())).await.unwrap();
 
     loop {
         select! {
