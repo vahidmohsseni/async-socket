@@ -1,8 +1,10 @@
+use bytes::BytesMut;
 use std::io;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::net::TcpStream;
 use tokio::select;
+use tokio::sync::mpsc;
 use tokio_rustls::rustls;
 use tokio_rustls::TlsConnector;
 
@@ -21,8 +23,11 @@ impl Client {
         }
     }
 
-    pub async fn run_client(&self) -> io::Result<()> {
-        let connect_fut = connect(&self.config);
+    pub async fn run_client(
+        &self,
+        send_back: mpsc::Sender<(mpsc::Receiver<BytesMut>, mpsc::Sender<BytesMut>)>,
+    ) -> io::Result<()> {
+        let connect_fut = connect(&self.config, send_back.clone());
 
         tokio::pin!(connect_fut);
 
@@ -80,7 +85,7 @@ impl Client {
                 _ = async move {}, if recovery == Recovery::Retry => {
                     number_of_retries += 1;
                     println!("Retyting: {number_of_retries} ...");
-                    connect_fut.  set(connect(&self.config));
+                    connect_fut.  set(connect(&self.config, send_back.clone()));
                     tokio::time::sleep(std::time::Duration::from_secs(2)).await;
                     recovery = Recovery::None;
                 }
@@ -89,7 +94,10 @@ impl Client {
     }
 }
 
-async fn connect(config: &ClientConfig) -> io::Result<()> {
+async fn connect(
+    config: &ClientConfig,
+    send_back: mpsc::Sender<(mpsc::Receiver<BytesMut>, mpsc::Sender<BytesMut>)>,
+) -> io::Result<()> {
     println!("Connecting ...");
 
     let address = config.get_address()?;
@@ -122,7 +130,7 @@ async fn connect(config: &ClientConfig) -> io::Result<()> {
 
     // let (mut reader, mut writer) = split(stream);
 
-    control_loop(stream, true).await?;
+    control_loop(stream, true, send_back).await?;
 
     Ok(())
 }

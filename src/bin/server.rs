@@ -1,4 +1,4 @@
-use tokio::select;
+use tokio::{select, sync::mpsc};
 
 extern crate async_socket;
 
@@ -14,10 +14,13 @@ async fn main() -> io::Result<()> {
 
     let server = Server::from_conf_file(path)?;
 
-    let serve_loop = server.run_server().await;
+    let (tx, rx) = mpsc::channel(20);
+
+    let serve_loop = server.run_server(tx).await;
 
     loop {
         select! {
+
             _ = tokio::time::sleep(std::time::Duration::from_secs(1)), if serve_loop.is_err() => {
                 // do something after waiting for 1 second
             }

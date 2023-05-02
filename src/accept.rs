@@ -1,7 +1,9 @@
+use bytes::BytesMut;
 use std::net::SocketAddr;
 use std::path::Path;
 use std::sync::Arc;
 use std::{io, path::PathBuf};
+use tokio::sync::mpsc;
 use tokio_rustls::{rustls, TlsAcceptor};
 
 use tokio::{
@@ -35,8 +37,11 @@ impl Server {
         })
     }
 
-    pub async fn run_server(self) -> io::Result<()> {
-        let accept_fut = accpet_connection(&self.config);
+    pub async fn run_server(
+        self,
+        send_back: mpsc::Sender<(mpsc::Receiver<BytesMut>, mpsc::Sender<BytesMut>)>,
+    ) -> io::Result<()> {
+        let accept_fut = accpet_connection(&self.config, send_back);
 
         tokio::pin!(accept_fut);
 
@@ -77,7 +82,10 @@ impl Server {
     }
 }
 
-async fn accpet_connection(config: &ServerConfig) -> io::Result<()> {
+async fn accpet_connection(
+    config: &ServerConfig,
+    send_back: mpsc::Sender<(mpsc::Receiver<BytesMut>, mpsc::Sender<BytesMut>)>,
+) -> io::Result<()> {
     let address = config.get_address()?;
     let (tls_cert, tls_key) = config.load_cert_and_key()?;
     let tls_enabled = config.is_tls_enabled();
@@ -97,7 +105,12 @@ async fn accpet_connection(config: &ServerConfig) -> io::Result<()> {
         loop {
             let (stream, address) = listener.accept().await?;
             println!("Accepting connection from: {}", address);
-            tokio::spawn(establish_connection(acceptor.clone(), stream, address));
+            tokio::spawn(establish_connection(
+                acceptor.clone(),
+                stream,
+                address,
+                send_back.clone(),
+            ));
         }
     }
 
@@ -108,6 +121,7 @@ async fn establish_connection(
     acceptor: TlsAcceptor,
     stream: TcpStream,
     address: SocketAddr,
+    send_back: mpsc::Sender<(mpsc::Receiver<BytesMut>, mpsc::Sender<BytesMut>)>,
 ) -> io::Result<()> {
     let stream = acceptor.accept(stream).await?;
     println!("TLS established from address: {address}");
@@ -115,7 +129,7 @@ async fn establish_connection(
     // run a macro to handle
     // let a = manage!(reader, writer);
 
-    control_loop(stream, false).await;
+    control_loop(stream, false, send_back).await;
 
     Ok(())
 }

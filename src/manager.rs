@@ -71,12 +71,12 @@ pub async fn control_loop<
 >(
     stream: T,
     keep_alive: bool,
-
+    send_back: mpsc::Sender<(mpsc::Receiver<BytesMut>, mpsc::Sender<BytesMut>)>
 ) -> io::Result<()> {
     let cancellation_token = CancellationToken::new();
 
     let (reader, writer) = tokio::io::split(stream);
-    let (recv_tx, mut recv_rx) = mpsc::channel::<BytesMut>(10);
+    let (recv_tx, recv_rx) = mpsc::channel::<BytesMut>(10);
 
     let (send_tx, send_rx) = mpsc::channel::<BytesMut>(10);
 
@@ -97,6 +97,9 @@ pub async fn control_loop<
     let mut shutdown = false;
 
     let mut result = Ok(());
+
+    send_back.send((recv_rx, send_tx.clone())).await;
+
     loop {
         select! {
 
