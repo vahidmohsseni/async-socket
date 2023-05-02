@@ -11,7 +11,7 @@ use tokio::{
     select,
 };
 
-use crate::manager::control_loop;
+use crate::manager::{server_control_loop};
 use crate::utils::server_helper::ServerConfig;
 
 pub struct Server {
@@ -49,7 +49,7 @@ impl Server {
             select! {
                 accept_result = &mut accept_fut => {
                     match accept_result {
-                        Ok(result) => println!("This is not possible: {:?}", result),
+                        Ok(result) => log::warn!("This is not possible: {:?}", result),
                         Err(error) => {
                             match error.kind() {
                                 io::ErrorKind::NotFound => todo!(),
@@ -90,7 +90,7 @@ async fn accpet_connection(
     let (tls_cert, tls_key) = config.load_cert_and_key()?;
     let tls_enabled = config.is_tls_enabled();
 
-    println!("running server ............");
+    log::info!("running server ............");
     let listener = TcpListener::bind(address).await?;
 
     if tls_enabled {
@@ -100,11 +100,11 @@ async fn accpet_connection(
             .with_single_cert(tls_cert, tls_key)
             .map_err(|err| io::Error::new(io::ErrorKind::InvalidInput, err))?;
         let acceptor = TlsAcceptor::from(Arc::new(tls_config));
-        println!("Waiting for a client... ");
+        log::info!("Waiting for a client... ");
 
         loop {
             let (stream, address) = listener.accept().await?;
-            println!("Accepting connection from: {}", address);
+            log::info!("Accepting connection from: {}", address);
             tokio::spawn(establish_connection(
                 acceptor.clone(),
                 stream,
@@ -124,12 +124,12 @@ async fn establish_connection(
     send_back: mpsc::Sender<(mpsc::Receiver<BytesMut>, mpsc::Sender<BytesMut>)>,
 ) -> io::Result<()> {
     let stream = acceptor.accept(stream).await?;
-    println!("TLS established from address: {address}");
+    log::info!("TLS established from address: {address}");
 
     // run a macro to handle
     // let a = manage!(reader, writer);
 
-    control_loop(stream, false, send_back).await;
+    server_control_loop(stream).await;
 
     Ok(())
 }

@@ -1,3 +1,4 @@
+
 use tokio::{select, sync::mpsc};
 
 extern crate async_socket;
@@ -8,7 +9,17 @@ use async_socket::accept::Server;
 
 #[tokio::main]
 async fn main() -> io::Result<()> {
-    println!("Hello from server!");
+
+    // Create a logger instance with a specific configuration
+    let config = simplelog::Config::default();
+    let level = simplelog::LevelFilter::Debug;
+    let logger = simplelog::SimpleLogger::new(level, config);
+
+    // Set the logger as the default for the application
+    log::set_boxed_logger(Box::new(logger)).unwrap();
+    log::set_max_level(level);
+
+    log::info!("Hello from server!");
 
     let path = Path::new("config.json");
 
@@ -16,12 +27,13 @@ async fn main() -> io::Result<()> {
 
     let (tx, rx) = mpsc::channel(20);
 
-    let serve_loop = server.run_server(tx).await;
+    let serve_loop = tokio::spawn(server.run_server(tx));
+
 
     loop {
         select! {
 
-            _ = tokio::time::sleep(std::time::Duration::from_secs(1)), if serve_loop.is_err() => {
+            _ = tokio::time::sleep(std::time::Duration::from_secs(1)) => {
                 // do something after waiting for 1 second
             }
         }

@@ -24,7 +24,7 @@ impl Client {
     }
 
     pub async fn run_client(
-        &self,
+        self,
         send_back: mpsc::Sender<(mpsc::Receiver<BytesMut>, mpsc::Sender<BytesMut>)>,
     ) -> io::Result<()> {
         let connect_fut = connect(&self.config, send_back.clone());
@@ -41,12 +41,11 @@ impl Client {
                 connect_result = &mut connect_fut, if recovery == Recovery::None => {
                     match connect_result {
                         Ok(res) => {
-                            println!("res: {:?}", res);
+                            log::info!("Connect returned Ok!: {:?}", res);
 
                         },
                         Err(error) => {
-                            println!("error: {error}");
-                            println!("kind: {:?}", error.kind());
+                            log::warn!("IO Error: {:?}, kind: {:?}", error, error.kind());
                             match error.kind() {
                                 io::ErrorKind::NotFound => todo!(),
                                 io::ErrorKind::PermissionDenied => todo!(),
@@ -55,15 +54,25 @@ impl Client {
                                     if last_error != Some(io::ErrorKind::ConnectionRefused) {number_of_retries = 0};
                                     last_error = Some(io::ErrorKind::ConnectionRefused);
                                 },
-                                io::ErrorKind::ConnectionReset => todo!(),
+                                io::ErrorKind::ConnectionReset => {
+                                    recovery = Recovery::Retry;
+                                    if last_error != Some(io::ErrorKind::ConnectionReset) {number_of_retries = 0};
+                                    last_error = Some(io::ErrorKind::ConnectionReset);
+                                },
                                 io::ErrorKind::ConnectionAborted => todo!(),
                                 io::ErrorKind::NotConnected => todo!(),
                                 io::ErrorKind::AddrInUse => todo!(),
                                 io::ErrorKind::AddrNotAvailable => todo!(),
-                                io::ErrorKind::BrokenPipe => todo!(),
+                                io::ErrorKind::BrokenPipe => {
+                                    recovery = Recovery::Retry;
+                                    if last_error != Some(io::ErrorKind::BrokenPipe) {number_of_retries = 0};
+                                    last_error = Some(io::ErrorKind::BrokenPipe);
+                                },
                                 io::ErrorKind::AlreadyExists => todo!(),
                                 io::ErrorKind::WouldBlock => todo!(),
-                                io::ErrorKind::InvalidInput => todo!(),
+                                io::ErrorKind::InvalidInput => {
+                                    return Err(error);
+                                },
                                 io::ErrorKind::InvalidData => todo!(),
                                 io::ErrorKind::TimedOut => todo!(),
                                 io::ErrorKind::WriteZero => todo!(),
@@ -84,7 +93,7 @@ impl Client {
 
                 _ = async move {}, if recovery == Recovery::Retry => {
                     number_of_retries += 1;
-                    println!("Retyting: {number_of_retries} ...");
+                    log::warn!("Retyting: {number_of_retries} ...");
                     connect_fut.  set(connect(&self.config, send_back.clone()));
                     tokio::time::sleep(std::time::Duration::from_secs(2)).await;
                     recovery = Recovery::None;
@@ -98,7 +107,7 @@ async fn connect(
     config: &ClientConfig,
     send_back: mpsc::Sender<(mpsc::Receiver<BytesMut>, mpsc::Sender<BytesMut>)>,
 ) -> io::Result<()> {
-    println!("Connecting ...");
+    log::info!("Connecting ...");
 
     let address = config.get_address()?;
     let root_cert_store = config.get_root_cert_store()?;
@@ -119,14 +128,14 @@ async fn connect(
     let connector = TlsConnector::from(Arc::new(tls_config));
 
     let stream = TcpStream::connect(&address).await?;
-    println!("tcp connection is ok");
+    log::debug!("tcp connection is ok");
 
     let domain = rustls::ServerName::try_from(domain.as_str())
         .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid dnsname"))?;
 
     let stream = connector.connect(domain, stream).await?;
 
-    println!("TLS is established!");
+    log::debug!("TLS is established!");
 
     // let (mut reader, mut writer) = split(stream);
 
