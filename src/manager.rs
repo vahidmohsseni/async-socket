@@ -1,5 +1,5 @@
-use bytes::{BytesMut, BufMut};
-use std::{io, sync::Arc};
+use bytes::{BufMut, BytesMut};
+use std::{io, net::SocketAddr, sync::Arc};
 
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt, ReadHalf, WriteHalf},
@@ -8,6 +8,8 @@ use tokio::{
 };
 
 use tokio_util::sync::CancellationToken;
+
+use crate::accept::NodeMsg;
 
 async fn _send_routine<T: AsyncWriteExt + Unpin>(
     writer: WriteHalf<T>,
@@ -75,7 +77,7 @@ pub async fn control_loop<
 >(
     stream: T,
     keep_alive: bool,
-    send_back: mpsc::Sender<(mpsc::Receiver<BytesMut>, mpsc::Sender<BytesMut>)>
+    send_back: mpsc::Sender<(mpsc::Receiver<BytesMut>, mpsc::Sender<BytesMut>)>,
 ) -> io::Result<()> {
     let cancellation_token = CancellationToken::new();
 
@@ -139,31 +141,67 @@ pub async fn control_loop<
     return result;
 }
 
-
-pub async fn server_control_loop<
+pub async fn node_control_loop<
     T: AsyncReadExt + AsyncWriteExt + Unpin + std::fmt::Debug + std::marker::Send + 'static,
-    >(
+>(
     stream: T,
-    )
-{
+    address: SocketAddr,
+    send_up: mpsc::Sender<NodeMsg>
+) {
     let (tx, mut rx) = mpsc::channel(2);
     tokio::spawn(control_loop(stream, false, tx));
 
     let (mut recv, send) = rx.recv().await.unwrap();
-    
+
+    let (upper_tx, mut upper_rx) = mpsc::channel(20);
+
+    send_up.send(NodeMsg::Connected(address)).await.unwrap();
+    send_up.send(NodeMsg::Sender(address, upper_tx)).await.unwrap();
+
     loop {
         select! {
 
-            _ = tokio::time::sleep(std::time::Duration::from_millis(1000)) => {
+            _ = tokio::time::sleep(std::time::Duration::from_millis(100)) => {
                 match recv.try_recv(){
-                    Ok(d) => log::info!("data: {:?}", d),
-                    Err(e) => log::warn!("error in scl: {:?}", e),
-                }
-                if send.send(BytesMut::from("I got you!")).await.is_err() {
-                    break;
-                }
+                    Ok(d) => {
+                        // log::debug!("data: {:?}", d);
+                        send_up.send(NodeMsg::Event(address, d)).await.unwrap();
+
+                    },
+                    Err(e) => {
+                        match e {
+                            mpsc::error::TryRecvError::Empty => {},
+                            mpsc::error::TryRecvError::Disconnected => {log::debug!("node: {:?} disconnected", address); break;},
+                        }
+                    },
+                };
+
+                match upper_rx.try_recv() {
+                    Ok(data) => {
+                        if send.send(data).await.is_err() {
+                            log::debug!("node: {:?} disconnected!", address);
+                            break;
+                        }
+                    },
+                    Err(e) => {
+                        match e {
+                            mpsc::error::TryRecvError::Empty => {},
+                            mpsc::error::TryRecvError::Disconnected => {
+                                log::error!("Upper channel is disconnected!");
+                                recv.close();
+                                break;
+                            },
+                        }
+                    },
+                };
+
+                // if send.send(BytesMut::from("I got you!")).await.is_err() {
+                //     log::debug!("node: {:?} disconnected!", address);
+                //     break;
+                // }
             }
         }
     }
 
+    send_up.send(NodeMsg::Disconnected(address)).await.unwrap();
 }

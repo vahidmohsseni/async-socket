@@ -11,8 +11,18 @@ use tokio::{
     select,
 };
 
-use crate::manager::{server_control_loop};
+use crate::manager::node_control_loop;
 use crate::utils::server_helper::ServerConfig;
+
+#[derive(Debug)]
+pub enum NodeMsg {
+    Event(SocketAddr, BytesMut),
+    Connected(SocketAddr),
+    Disconnected(SocketAddr),
+    Sender(SocketAddr, tokio::sync::mpsc::Sender<BytesMut>),
+}
+
+
 
 pub struct Server {
     config: ServerConfig,
@@ -39,7 +49,7 @@ impl Server {
 
     pub async fn run_server(
         self,
-        send_back: mpsc::Sender<(mpsc::Receiver<BytesMut>, mpsc::Sender<BytesMut>)>,
+        send_back: mpsc::Sender<NodeMsg>,
     ) -> io::Result<()> {
         let accept_fut = accpet_connection(&self.config, send_back);
 
@@ -84,7 +94,7 @@ impl Server {
 
 async fn accpet_connection(
     config: &ServerConfig,
-    send_back: mpsc::Sender<(mpsc::Receiver<BytesMut>, mpsc::Sender<BytesMut>)>,
+    send_back: mpsc::Sender<NodeMsg>,
 ) -> io::Result<()> {
     let address = config.get_address()?;
     let (tls_cert, tls_key) = config.load_cert_and_key()?;
@@ -121,7 +131,7 @@ async fn establish_connection(
     acceptor: TlsAcceptor,
     stream: TcpStream,
     address: SocketAddr,
-    send_back: mpsc::Sender<(mpsc::Receiver<BytesMut>, mpsc::Sender<BytesMut>)>,
+    send_back: mpsc::Sender<NodeMsg>,
 ) -> io::Result<()> {
     let stream = acceptor.accept(stream).await?;
     log::info!("TLS established from address: {address}");
@@ -129,7 +139,7 @@ async fn establish_connection(
     // run a macro to handle
     // let a = manage!(reader, writer);
 
-    server_control_loop(stream).await;
+    node_control_loop(stream, address, send_back).await;
 
     Ok(())
 }

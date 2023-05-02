@@ -1,6 +1,6 @@
 extern crate async_socket;
 
-use std::{io, path::PathBuf, time::Duration};
+use std::{io, path::PathBuf};
 
 use async_socket::connect::Client;
 use bytes::BytesMut;
@@ -28,7 +28,7 @@ async fn main() -> io::Result<()> {
 
     let (tx, mut rx) = mpsc::channel(2);
 
-    let connect_loop = tokio::spawn(client.run_client(tx));
+    let _connect_loop = tokio::spawn(client.run_client(tx));
 
     let (mut recv, mut send) = rx.recv().await.unwrap();
 
