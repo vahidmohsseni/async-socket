@@ -122,7 +122,7 @@ async fn connect(config: &ClientConfig) -> io::Result<()> {
 
     // let (mut reader, mut writer) = split(stream);
 
-    control_loop(stream).await?;
+    control_loop(stream, true).await?;
 
     Ok(())
 }

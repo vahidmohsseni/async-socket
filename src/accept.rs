@@ -115,7 +115,7 @@ async fn establish_connection(
     // run a macro to handle
     // let a = manage!(reader, writer);
 
-    control_loop(stream).await;
+    control_loop(stream, false).await;
 
     Ok(())
 }
