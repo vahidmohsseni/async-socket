@@ -60,7 +60,7 @@ async fn main() -> io::Result<()> {
 
                 if send > 0{
                     for i in 0..send{
-                        if senders[i].send(BytesMut::from("kir to khomeini!")).await.is_err(){
+                        if senders[i].send(BytesMut::from("Dummy data!")).await.is_err(){
                             log::debug!("Error! address {:?}", nodes);
                         };
                     }
