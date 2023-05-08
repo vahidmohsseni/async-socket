@@ -35,6 +35,8 @@ async fn main() -> io::Result<()> {
     let mut senders:Vec<mpsc::Sender<BytesMut>> = Vec::with_capacity(10);
     let mut nodes = Vec::with_capacity(10);
     let mut send = 0;
+
+    let (tx, mut rx) = tokio::sync::mpsc::channel(5);
     loop {
         select! {
 
@@ -52,8 +54,9 @@ async fn main() -> io::Result<()> {
                         nodes.remove(indx);
                         senders.remove(indx);
                     },
-                    NodeMsg::Sender(addr, sen) => {
+                    NodeMsg::Sender(addr, sen, close_tx) => {
                         log::info!("addr {addr} is added!");
+                        tx.send(close_tx).await.unwrap();
                         senders.push(sen); nodes.push(addr); send += 1;
                     },
                 }
@@ -64,6 +67,17 @@ async fn main() -> io::Result<()> {
                             log::debug!("Error! address {:?}", nodes);
                         };
                     }
+                }
+            },
+
+            ch = rx.recv() => {
+                match ch {
+                    Some(t) => {
+                        tokio::time::sleep(std::time::Duration::from_millis(2000)).await;
+                        // Comment this line if you don't want to close the channel after 2 sec
+                        t.send(()).unwrap();
+                    },
+                    None => todo!(),
                 }
             }
         }

@@ -78,6 +78,7 @@ pub async fn control_loop<
     stream: T,
     keep_alive: bool,
     send_back: mpsc::Sender<(mpsc::Receiver<BytesMut>, mpsc::Sender<BytesMut>)>,
+    mut close_socket: oneshot::Receiver<()>,
 ) -> io::Result<()> {
     let cancellation_token = CancellationToken::new();
 
@@ -135,6 +136,11 @@ pub async fn control_loop<
                 cancellation_token.cancel();
                 break;
             }
+
+            _ = &mut close_socket => {
+                cancellation_token.cancel();
+                break;
+            }
         }
     }
 
@@ -146,17 +152,23 @@ pub async fn node_control_loop<
 >(
     stream: T,
     address: SocketAddr,
-    send_up: mpsc::Sender<NodeMsg>
+    send_up: mpsc::Sender<NodeMsg>,
 ) {
     let (tx, mut rx) = mpsc::channel(2);
-    tokio::spawn(control_loop(stream, false, tx));
+
+    let (end_connection_tx, end_connection_rx) = oneshot::channel();
+
+    tokio::spawn(control_loop(stream, false, tx, end_connection_rx));
 
     let (mut recv, send) = rx.recv().await.unwrap();
 
     let (upper_tx, mut upper_rx) = mpsc::channel(20);
 
     send_up.send(NodeMsg::Connected(address)).await.unwrap();
-    send_up.send(NodeMsg::Sender(address, upper_tx)).await.unwrap();
+    send_up
+        .send(NodeMsg::Sender(address, upper_tx, end_connection_tx))
+        .await
+        .unwrap();
 
     loop {
         select! {

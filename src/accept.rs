@@ -19,10 +19,12 @@ pub enum NodeMsg {
     Event(SocketAddr, BytesMut),
     Connected(SocketAddr),
     Disconnected(SocketAddr),
-    Sender(SocketAddr, tokio::sync::mpsc::Sender<BytesMut>),
+    Sender(
+        SocketAddr,
+        tokio::sync::mpsc::Sender<BytesMut>,
+        tokio::sync::oneshot::Sender<()>,
+    ),
 }
-
-
 
 pub struct Server {
     config: ServerConfig,
@@ -47,10 +49,7 @@ impl Server {
         })
     }
 
-    pub async fn run_server(
-        self,
-        send_back: mpsc::Sender<NodeMsg>,
-    ) -> io::Result<()> {
+    pub async fn run_server(self, send_back: mpsc::Sender<NodeMsg>) -> io::Result<()> {
         let accept_fut = accpet_connection(&self.config, send_back);
 
         tokio::pin!(accept_fut);

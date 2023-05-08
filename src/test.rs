@@ -56,26 +56,26 @@ fn generate_key_cert() -> Result<(X509, PKey<Private>), ErrorStack> {
 
 #[cfg(test)]
 mod test1 {
-    
-    use std::{
-        fs::File,
-        io::Write,
-        path::Path,
-    };
+
+    use std::{fs::File, io::Write, path::Path};
 
     use super::generate_key_cert;
 
     #[test]
-    fn generate_keys () {
+    fn generate_keys() {
         let dir = format!("./keys/");
         let path = Path::new(&dir);
         let (cert, key) = generate_key_cert().unwrap();
 
         let mut key_file = File::create(path.join("key.pem")).unwrap();
-        key_file.write_all(key.rsa().unwrap().private_key_to_pem().unwrap().as_ref()).unwrap();
+        key_file
+            .write_all(key.rsa().unwrap().private_key_to_pem().unwrap().as_ref())
+            .unwrap();
 
         let mut cert_file = File::create(path.join("cert.pem")).unwrap();
-        cert_file.write_all(cert.to_pem().unwrap().as_ref()).unwrap();
+        cert_file
+            .write_all(cert.to_pem().unwrap().as_ref())
+            .unwrap();
     }
 }
 

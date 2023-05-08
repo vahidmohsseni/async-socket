@@ -79,9 +79,7 @@ impl Client {
                                 io::ErrorKind::Interrupted => todo!(),
                                 io::ErrorKind::Unsupported => todo!(),
                                 io::ErrorKind::UnexpectedEof => {
-                                    recovery = Recovery::Retry;
-                                    if last_error != Some(io::ErrorKind::UnexpectedEof) {number_of_retries = 0};
-                                    last_error = Some(io::ErrorKind::UnexpectedEof);
+                                    return Err(error);
                                 },
                                 io::ErrorKind::OutOfMemory => todo!(),
                                 io::ErrorKind::Other => return Err(error),
@@ -138,8 +136,8 @@ async fn connect(
     log::debug!("TLS is established!");
 
     // let (mut reader, mut writer) = split(stream);
-
-    control_loop(stream, true, send_back).await?;
+    let (_t, r) = tokio::sync::oneshot::channel();
+    control_loop(stream, true, send_back, r).await?;
 
     Ok(())
 }
