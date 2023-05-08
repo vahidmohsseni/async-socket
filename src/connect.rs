@@ -118,7 +118,7 @@ async fn connect(
 
     // TODO: due to tls configuration, the domain name must be passed to the function
     // OR the server ip address must be seen in the signed certificate
-    let domain = "127.0.0.1".to_string();
+    let domain = address.ip().to_string();
 
     let tls_config = rustls::ClientConfig::builder()
         .with_safe_defaults()
