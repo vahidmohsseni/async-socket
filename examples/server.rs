@@ -59,6 +59,9 @@ async fn main() -> io::Result<()> {
                         tx.send(close_tx).await.unwrap();
                         senders.push(sen); nodes.push(addr); send += 1;
                     },
+                    NodeMsg::MasterDisconnected(_) => {
+                        
+                    }
                 }
 
                 if send > 0{

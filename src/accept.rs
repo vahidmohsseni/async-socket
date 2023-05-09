@@ -24,6 +24,7 @@ pub enum NodeMsg {
         tokio::sync::mpsc::Sender<BytesMut>,
         tokio::sync::oneshot::Sender<()>,
     ),
+    MasterDisconnected(SocketAddr),
 }
 
 pub struct Server {
