@@ -137,7 +137,10 @@ pub async fn control_loop<
                 break;
             }
 
-            _ = &mut close_socket => {
+            close_recv = &mut close_socket => {
+                if close_recv.is_err() {
+                    log::warn!("socket is closed due to the error in close-socket channel: the send-end may be dropped! {:?}", close_recv);
+                }
                 cancellation_token.cancel();
                 break;
             }

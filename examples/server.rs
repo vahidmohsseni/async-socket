@@ -33,10 +33,10 @@ async fn main() -> io::Result<()> {
     let _serve_loop = tokio::spawn(server.run_server(tx));
 
     let mut senders:Vec<mpsc::Sender<BytesMut>> = Vec::with_capacity(10);
+    let mut senders_disconnect = Vec::with_capacity(10);
     let mut nodes = Vec::with_capacity(10);
     let mut send = 0;
-
-    let (tx, mut rx) = tokio::sync::mpsc::channel(5);
+    let mut shutdown = Vec::with_capacity(10);
     loop {
         select! {
 
@@ -53,10 +53,12 @@ async fn main() -> io::Result<()> {
                         let indx = nodes.iter().position(|&x| x == addr).unwrap();
                         nodes.remove(indx);
                         senders.remove(indx);
+                        shutdown.remove(indx);
                     },
                     NodeMsg::Sender(addr, sen, close_tx) => {
                         log::info!("addr {addr} is added!");
-                        tx.send(close_tx).await.unwrap();
+                        senders_disconnect.push(close_tx);
+                        shutdown.push(0);
                         senders.push(sen); nodes.push(addr); send += 1;
                     },
                     NodeMsg::MasterDisconnected(_) => {
@@ -66,23 +68,21 @@ async fn main() -> io::Result<()> {
 
                 if send > 0{
                     for i in 0..send{
+                        shutdown[i] += 1;
                         if senders[i].send(BytesMut::from("Dummy data!")).await.is_err(){
                             log::debug!("Error! address {:?}", nodes);
                         };
+                        // shut down the node when 10 message is sent
+                        if shutdown[i] > 10 {
+                            // comment these lines if you do not want to close the channel
+                            let t = senders_disconnect.remove(i);
+                            t.send(()).unwrap();
+
+                        }
                     }
                 }
             },
 
-            ch = rx.recv() => {
-                match ch {
-                    Some(t) => {
-                        tokio::time::sleep(std::time::Duration::from_millis(2000)).await;
-                        // Comment this line if you don't want to close the channel after 2 sec
-                        t.send(()).unwrap();
-                    },
-                    None => todo!(),
-                }
-            }
         }
     }
 
