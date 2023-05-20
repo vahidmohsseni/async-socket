@@ -25,6 +25,7 @@ subjectAltName = @alt_names
 [alt_names]
 DNS.1 = localhost
 IP.1 = 127.0.0.1
+IP.2 = ::1
 EOF
 
 # Sign the CSR (`cert.pem`) with the root CA certificate and private key
