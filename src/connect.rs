@@ -46,6 +46,9 @@ impl Client {
                         },
                         Err(error) => {
                             log::warn!("IO Error: {:?}, kind: {:?}", error, error.kind());
+                            if number_of_retries >= 5 {
+                                return Err(error)
+                            }
                             match error.kind() {
                                 io::ErrorKind::NotFound => todo!(),
                                 io::ErrorKind::PermissionDenied => todo!(),
@@ -92,8 +95,8 @@ impl Client {
                 _ = async move {}, if recovery == Recovery::Retry => {
                     number_of_retries += 1;
                     log::warn!("Retyting: {number_of_retries} ...");
-                    connect_fut.set(connect(&self.config, send_back.clone()));
                     tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                    connect_fut.set(connect(&self.config, send_back.clone()));
                     recovery = Recovery::None;
                 }
             }
